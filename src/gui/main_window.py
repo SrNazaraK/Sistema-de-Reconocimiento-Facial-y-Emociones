@@ -4,12 +4,13 @@ from PIL import Image
 from src.core.emociones import AnalizadorEmociones
 from src.database.db_handler import DatabaseHandler
 from src.gui.registro_window import VentanaRegistro
+from src.gui.reportes_window import VentanaReportes # Importación nueva
 
 class AppEmociones(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Sistema de Reconocimiento Facial - URU 2026")
+        self.title("Sistema de Reconocimiento Facial y Analítica - URU 2026")
         self.geometry("1100x700")
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
@@ -25,26 +26,35 @@ class AppEmociones(ctk.CTk):
         self.nombre_actual = "Desconocido"
         self.usuarios_db = []
 
-        # --- Interfaz ---
+        # --- Layout Principal ---
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
+        # Sidebar (Izquierda)
         self.sidebar = ctk.CTkFrame(self, width=240, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         
         self.logo_label = ctk.CTkLabel(self.sidebar, text="🤖 IA FACIAL URU", 
                                        font=ctk.CTkFont(size=22, weight="bold"))
-        self.logo_label.pack(pady=(30, 30))
+        self.logo_label.pack(pady=(30, 20))
 
+        # Botones de Control
         self.btn_analizar = ctk.CTkButton(self.sidebar, text="Encender Cámara", 
                                          command=self.toggle_analisis, height=45)
         self.btn_analizar.pack(padx=20, pady=10)
 
-        self.btn_registro = ctk.CTkButton(self.sidebar, text="Registrar Nuevo Usuario", 
+        self.btn_registro = ctk.CTkButton(self.sidebar, text="Registrar Usuario", 
                                          command=self.abrir_ventana_registro, 
                                          fg_color="transparent", border_width=2, height=45)
         self.btn_registro.pack(padx=20, pady=10)
 
+        # NUEVO: Botón de Reportes y Estadísticas
+        self.btn_reportes = ctk.CTkButton(self.sidebar, text="Estadísticas y Reportes", 
+                                          command=self.abrir_ventana_reportes, 
+                                          fg_color="gray30", height=45)
+        self.btn_reportes.pack(padx=20, pady=10)
+
+        # Panel de Datos en Tiempo Real
         self.info_frame = ctk.CTkFrame(self.sidebar, fg_color="gray10")
         self.info_frame.pack(padx=20, pady=30, fill="x")
         
@@ -58,6 +68,7 @@ class AppEmociones(ctk.CTk):
         self.label_confianza = ctk.CTkLabel(self.info_frame, text="Confianza: ---", font=("Arial", 15))
         self.label_confianza.pack(pady=5)
 
+        # Contenedor de Video (Derecha)
         self.video_container = ctk.CTkFrame(self, fg_color="black", corner_radius=15)
         self.video_container.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
         
@@ -65,14 +76,13 @@ class AppEmociones(ctk.CTk):
         self.video_label.pack(expand=True, fill="both")
 
     def cargar_usuarios(self):
-        """Refresca la lista de usuarios desde la base de datos"""
+        """Sincroniza los usuarios de la DB con la memoria RAM"""
         try:
             with self.db.conectar() as conn:
                 cursor = conn.cursor()
-                # embedding_path aquí contiene el string del vector
                 cursor.execute("SELECT id, nombre, embedding_path FROM personas")
                 self.usuarios_db = cursor.fetchall()
-                print(f"✅ Memoria sincronizada: {len(self.usuarios_db)} usuarios.")
+                print(f"✅ DB Sincronizada: {len(self.usuarios_db)} usuarios listos.")
         except Exception as e:
             print(f"Error cargando usuarios: {e}")
 
@@ -98,35 +108,44 @@ class AppEmociones(ctk.CTk):
             if ret:
                 frame = cv2.flip(frame, 1)
                 
-                # Análisis de Emociones
+                # 1. Análisis de Emociones
                 datos = self.analizador.analizar_rostro(frame)
                 
                 if datos:
-                    # Reconocimiento cada 30 frames
+                    # 2. Reconocimiento de Identidad cada 30 frames
                     if self.conteo_frames % 30 == 0:
                         emb_actual = self.analizador.detector.generar_embedding(frame)
                         if emb_actual:
-                            # Pasamos el reconocimiento
                             self.nombre_actual = self.analizador.detector.buscar_coincidencia(
                                 emb_actual, self.usuarios_db
                             )
+                            
+                            # 3. GUARDADO AUTOMÁTICO EN HISTORIAL
+                            # Solo guardamos si es un usuario conocido
+                            if self.nombre_actual != "Desconocido":
+                                self.db.guardar_deteccion(
+                                    self.nombre_actual, 
+                                    datos['emocion'], 
+                                    round(float(datos['confianza']), 2)
+                                )
                     
                     self.conteo_frames += 1
 
-                    # Dibujar en pantalla
+                    # Dibujar Rectángulo Dinámico
                     x, y, w, h = datos['box']['x'], datos['box']['y'], datos['box']['w'], datos['box']['h']
                     color = (46, 204, 113) if self.nombre_actual != "Desconocido" else (231, 76, 60)
                     
                     cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
-                    cv2.putText(frame, self.nombre_actual, (x, y-10), 
+                    cv2.putText(frame, f"{self.nombre_actual}", (x, y-10), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
                     
-                    # Actualizar etiquetas con redondeo limpio
-                    conf_redondeada = round(float(datos['confianza']), 2)
+                    # Actualizar Interfaz (Redondeando decimales)
+                    conf_limpia = round(float(datos['confianza']), 2)
                     self.label_usuario.configure(text=f"Usuario: {self.nombre_actual}")
                     self.label_emocion.configure(text=f"Emoción: {datos['emocion']}")
-                    self.label_confianza.configure(text=f"Confianza: {conf_redondeada}%")
+                    self.label_confianza.configure(text=f"Confianza: {conf_limpia}%")
 
+                # Renderizar en la GUI
                 img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 img_pil = Image.fromarray(img_rgb)
                 img_ctk = ctk.CTkImage(light_image=img_pil, dark_image=img_pil, size=(720, 540))
@@ -138,3 +157,11 @@ class AppEmociones(ctk.CTk):
         ventana = VentanaRegistro(self)
         self.wait_window(ventana)
         self.cargar_usuarios()
+
+    def abrir_ventana_reportes(self):
+        """Abre la ventana de estadísticas y analítica"""
+        VentanaReportes(self)
+
+if __name__ == "__main__":
+    app = AppEmociones()
+    app.mainloop()
