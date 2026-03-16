@@ -1,0 +1,17 @@
+# Entorno virtual
+venv/
+.venv/
+env/
+
+# Datos y Base de Datos (Muy importante)
+data/
+*.sqlite
+*.db
+
+# Python
+__pycache__/
+*.pyc
+
+# IDEs
+.vscode/
+.idea/
