@@ -3,14 +3,21 @@ venv/
 .venv/
 env/
 
-# Datos y Base de Datos (Muy importante)
-data/
-*.sqlite
-*.db
+# Ignorar la base de datos personal
+data/*.db
+data/*.sqlite
 
-# Python
+# Ignorar las fotos de rostros registrados
+data/rostros_registrados/
+*.jpg
+*.png
+
+# Pero NO ignores la carpeta data en sí, solo su contenido
+!data/.gitkeep
+
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
 
 # IDEs
 .vscode/

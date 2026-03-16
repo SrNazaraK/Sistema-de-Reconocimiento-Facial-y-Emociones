@@ -5,7 +5,6 @@ from datetime import datetime
 class DatabaseHandler:
     def __init__(self, db_path="data/facial_emotions.db"):
         self.db_path = db_path
-        # Crear carpeta data si no existe
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.inicializar_tablas()
 
@@ -38,11 +37,8 @@ class DatabaseHandler:
             cursor.execute(query_historial)
             conn.commit()
 
-def registrar_persona(self, nombre, apellido, email, embedding):
-        """Registra una persona incluyendo su firma facial"""
-        # Convertimos la lista de números a un string para guardarlo en SQLite
-        embedding_str = str(embedding) 
-        
+    def registrar_persona(self, nombre, apellido, email, embedding):
+        embedding_str = str(embedding)
         try:
             with self.conectar() as conn:
                 cursor = conn.cursor()
@@ -54,7 +50,6 @@ def registrar_persona(self, nombre, apellido, email, embedding):
                 return cursor.lastrowid
         except sqlite3.IntegrityError:
             return None
-
 
     def guardar_deteccion(self, persona_id, emocion, confianza):
         fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
